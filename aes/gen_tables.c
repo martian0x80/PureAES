@@ -1,4 +1,4 @@
-#include "aes.h"
+#include "gen_table.h"
 
 uint8_t gfaddTable[0xff][0xff];
 uint8_t gfmulTable[0xff][0xff];
