@@ -30,7 +30,7 @@ const uint16_t PP = 0x11b;
  */
 
 uint8_t gfadd(uint8_t byte1, uint8_t byte2) {
-    return byte1 ^ byte2;
+	return byte1 ^ byte2;
 }
 
 /*
@@ -38,22 +38,22 @@ uint8_t gfadd(uint8_t byte1, uint8_t byte2) {
  * 	Based on the pseudo code explained in https://www.wikiwand.com/en/Finite_field_arithmetic#Rijndael's_(AES)_finite_field
  */
 uint8_t gfmul(uint8_t x, uint8_t y) {
-    uint8_t p = 0; // p is the product
-    while (x != 0 && y != 0) {
-        uint8_t carry = 0;
-        if (y & 0x01) {
-            p ^= x;
-        }
-        y >>= 1;
-        if (x & 0x80) {
-            carry = 1;
-        }
-        x <<= 1;
-        if (carry) {
-            x ^= PP;
-        }
-    }
-    return p;
+	uint8_t p = 0; // p is the product
+	while (x != 0 && y != 0) {
+		uint8_t carry = 0;
+		if (y & 0x01) {
+			p ^= x;
+		}
+		y >>= 1;
+		if (x & 0x80) {
+			carry = 1;
+		}
+		x <<= 1;
+		if (carry) {
+			x ^= PP;
+		}
+	}
+	return p;
 }
 
 /*
@@ -71,7 +71,7 @@ uint8_t xtime(uint8_t x) {
  * a(x) + b(x) = (a^3 + b^3) x^3 + (a^2 + b^2) x^2 + (a^1 + b^1) x^1 + (a^0 + b^0) x^0
  * Here, + is equivalent to XOR, and the coefficients of the polynomial are the bytes of the word.
  */
-void gfadd_words(uint8_t* a, uint8_t* b, uint8_t* c) {
+void gfadd_words(uint8_t *a, uint8_t *b, uint8_t *c) {
 	/*
 	c[0] = a[0] ^ b[0];
 	c[1] = a[1] ^ b[1];
@@ -80,7 +80,7 @@ void gfadd_words(uint8_t* a, uint8_t* b, uint8_t* c) {
 	*/
 
 	// This is apparently equivalent to
-	*(uint32_t *)c = *(uint32_t *)a ^ *(uint32_t *)b;
+	*(uint32_t *) c = *(uint32_t *) a ^ *(uint32_t *) b;
 }
 
 /*
@@ -104,8 +104,7 @@ void gfmul_words(uint8_t a[], uint8_t b[], uint8_t c[]) {
 
 void SubBytes() {}
 
-int main(int argc, char **argv)
-{	/*
+int main(int argc, char **argv) {    /*
 	if (argc < 3) {
 		printf("Insufficient args.\n");
 	} else {
@@ -114,7 +113,8 @@ int main(int argc, char **argv)
 		printf("Polynomial multiplication in GF(2^8):\n\t {%x} * {%x} = {%x}\n", x, y, gfmul(x,y)); 
 	}
  */
-    //printf("%x\n", gfmul(0x57, 0x83));
-    //printf("%x", xtime(xtime(0x57)));
-    return 0;
+	gentable();
+	//printf("%x\n", gfmul(0x57, 0x83));
+	//printf("%x", xtime(xtime(0x57)));
+	return 0;
 }

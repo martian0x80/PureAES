@@ -7,16 +7,22 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+// Extracting [i][j]th element from a two dimensional array represented as a one-dimensional array
+#define GET_ELEM(arr, i, j, n) (arr[n*(i-1)+j])
+
 /*
  * Functions from aes.c
  */
 extern const uint16_t PP;
+
 uint8_t gfadd(uint8_t x, uint8_t y);
+
 uint8_t gfmul(uint8_t x, uint8_t y);
 
 /*
  * Other
  */
-
+int gentable(void);
 
 #endif //AES_AES_H
