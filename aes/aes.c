@@ -15,6 +15,9 @@ const unsigned char N_k;
 // Number of rounds, a function of N_k, belongs in {10, 12, 14}
 const unsigned char N_r;
 
+// Reduction Irreducible polynomial GF(2^8)
+const uint16_t PP = 0x11b;
+
 /*
  * The addition of two elements in a finite field is achieved by adding the coefficients for the
  * corresponding powers in the polynomials for the two elements. The addition is performed with
@@ -47,7 +50,7 @@ uint8_t gfmul(uint8_t x, uint8_t y) {
         }
         x <<= 1;
         if (carry) {
-            x ^= 0x11b;
+            x ^= PP;
         }
     }
     return p;
@@ -99,7 +102,7 @@ void gfmul_words(uint8_t a[], uint8_t b[], uint8_t c[]) {
 	c[3] = gfmul(a[3], b[0]) ^ gfmul(a[2], b[1]) ^ gfmul(a[1], b[2]) ^ gfmul(a[0], b[3]);
 }
 
-
+void SubBytes() {}
 
 int main(int argc, char **argv)
 {	/*
@@ -111,7 +114,6 @@ int main(int argc, char **argv)
 		printf("Polynomial multiplication in GF(2^8):\n\t {%x} * {%x} = {%x}\n", x, y, gfmul(x,y)); 
 	}
  */
-	gentable();
     //printf("%x\n", gfmul(0x57, 0x83));
     //printf("%x", xtime(xtime(0x57)));
     return 0;
