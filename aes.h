@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 // Extracting [i][j]th element from a two dimensional array represented as a one-dimensional array
-#define GET_ELEM(arr, i, j, n) (arr[n*(i-1)+j])
+#define GET_ELEM(arr, i, j, n) (arr[n * i + j])
 
 /*
  * Functions from aes.c
@@ -24,5 +24,6 @@ uint8_t gfmul(uint8_t x, uint8_t y);
  * Other
  */
 int gentable(void);
+void print_table(uint8_t*, uint8_t);
 
 #endif //AES_AES_H

@@ -3,20 +3,48 @@
 
 #include "aes.h"
 
-// 1 word = 4 bytes = 32 bits
-const unsigned char N_w = 0x20;
+// Macro for the cyclic shift in ShiftRows
+#define shift(r, N_b) r
 
-// Block size in words (:= 4 bytes = 32 bits = 128 bit), constant for all N_k sizes
-const unsigned char N_b = 0x4;
+// Helper macro to get the array at (i, j) th column, since the state array is one-dimensional
+#define getStateArr(arr, N_b, x, y) arr[x * N_b + y]
+
+// 1 word = 4 bytes = 32 bits
+static const unsigned char N_w = 0x4;
+
+// Block size in words (= 16 bytes = 128 bits), constant for all N_k sizes
+static const unsigned char N_block = 0x4;
+
+// Number of columns in the state array, belongs in {4, 6, 8} words
+static const unsigned char N_b = 0x4;
 
 // Key size/length, belongs in {4, 6, 8} words = {16, 24, 32} bytes = {128, 192, 256} bits
 const unsigned char N_k;
 
 // Number of rounds, a function of N_k, belongs in {10, 12, 14}
-const unsigned char N_r;
+static const unsigned char N_r;
 
 // Reduction Irreducible polynomial GF(2^8)
 const uint16_t PP = 0x11b;
+
+
+static const uint8_t sbox[256] =
+				{0x63 ,0x7c ,0x77 ,0x7b ,0xf2 ,0x6b ,0x6f ,0xc5 ,0x30 ,0x01 ,0x67 ,0x2b ,0xfe ,0xd7 ,0xab ,0x76
+				,0xca ,0x82 ,0xc9 ,0x7d ,0xfa ,0x59 ,0x47 ,0xf0 ,0xad ,0xd4 ,0xa2 ,0xaf ,0x9c ,0xa4 ,0x72 ,0xc0
+				,0xb7 ,0xfd ,0x93 ,0x26 ,0x36 ,0x3f ,0xf7 ,0xcc ,0x34 ,0xa5 ,0xe5 ,0xf1 ,0x71 ,0xd8 ,0x31 ,0x15
+				,0x04 ,0xc7 ,0x23 ,0xc3 ,0x18 ,0x96 ,0x05 ,0x9a ,0x07 ,0x12 ,0x80 ,0xe2 ,0xeb ,0x27 ,0xb2 ,0x75
+				,0x09 ,0x83 ,0x2c ,0x1a ,0x1b ,0x6e ,0x5a ,0xa0 ,0x52 ,0x3b ,0xd6 ,0xb3 ,0x29 ,0xe3 ,0x2f ,0x84
+				,0x53 ,0xd1 ,0x00 ,0xed ,0x20 ,0xfc ,0xb1 ,0x5b ,0x6a ,0xcb ,0xbe ,0x39 ,0x4a ,0x4c ,0x58 ,0xcf
+				,0xd0 ,0xef ,0xaa ,0xfb ,0x43 ,0x4d ,0x33 ,0x85 ,0x45 ,0xf9 ,0x02 ,0x7f ,0x50 ,0x3c ,0x9f ,0xa8
+				,0x51 ,0xa3 ,0x40 ,0x8f ,0x92 ,0x9d ,0x38 ,0xf5 ,0xbc ,0xb6 ,0xda ,0x21 ,0x10 ,0xff ,0xf3 ,0xd2
+				,0xcd ,0x0c ,0x13 ,0xec ,0x5f ,0x97 ,0x44 ,0x17 ,0xc4 ,0xa7 ,0x7e ,0x3d ,0x64 ,0x5d ,0x19 ,0x73
+				,0x60 ,0x81 ,0x4f ,0xdc ,0x22 ,0x2a ,0x90 ,0x88 ,0x46 ,0xee ,0xb8 ,0x14 ,0xde ,0x5e ,0x0b ,0xdb
+				,0xe0 ,0x32 ,0x3a ,0x0a ,0x49 ,0x06 ,0x24 ,0x5c ,0xc2 ,0xd3 ,0xac ,0x62 ,0x91 ,0x95 ,0xe4 ,0x79
+				,0xe7 ,0xc8 ,0x37 ,0x6d ,0x8d ,0xd5 ,0x4e ,0xa9 ,0x6c ,0x56 ,0xf4 ,0xea ,0x65 ,0x7a ,0xae ,0x08
+				,0xba ,0x78 ,0x25 ,0x2e ,0x1c ,0xa6 ,0xb4 ,0xc6 ,0xe8 ,0xdd ,0x74 ,0x1f ,0x4b ,0xbd ,0x8b ,0x8a
+				,0x70 ,0x3e ,0xb5 ,0x66 ,0x48 ,0x03 ,0xf6 ,0x0e ,0x61 ,0x35 ,0x57 ,0xb9 ,0x86 ,0xc1 ,0x1d ,0x9e
+				,0xe1 ,0xf8 ,0x98 ,0x11 ,0x69 ,0xd9 ,0x8e ,0x94 ,0x9b ,0x1e ,0x87 ,0xe9 ,0xce ,0x55 ,0x28 ,0xdf
+				,0x8c ,0xa1 ,0x89 ,0x0d ,0xbf ,0xe6 ,0x42 ,0x68 ,0x41 ,0x99 ,0x2d ,0x0f ,0xb0 ,0x54 ,0xbb ,0x16};
 
 /*
  * The addition of two elements in a finite field is achieved by adding the coefficients for the
@@ -37,6 +65,7 @@ uint8_t gfadd(uint8_t byte1, uint8_t byte2) {
  * 	Russian Peasant Multiplication
  * 	Based on the pseudo code explained in https://www.wikiwand.com/en/Finite_field_arithmetic#Rijndael's_(AES)_finite_field
  */
+
 uint8_t gfmul(uint8_t x, uint8_t y) {
 	uint8_t p = 0; // p is the product
 	while (x != 0 && y != 0) {
@@ -59,6 +88,7 @@ uint8_t gfmul(uint8_t x, uint8_t y) {
 /*
  * 	Multiply the binary polynomial by x, which is equivalent to multiplication by 0x02 or 0b10.
  */
+
 uint8_t xtime(uint8_t x) {
 	return gfmul(x, 0x02);
 }
@@ -71,7 +101,9 @@ uint8_t xtime(uint8_t x) {
  * a(x) + b(x) = (a^3 + b^3) x^3 + (a^2 + b^2) x^2 + (a^1 + b^1) x^1 + (a^0 + b^0) x^0
  * Here, + is equivalent to XOR, and the coefficients of the polynomial are the bytes of the word.
  */
+
 void gfadd_words(uint8_t *a, uint8_t *b, uint8_t *c) {
+
 	/*
 	c[0] = a[0] ^ b[0];
 	c[1] = a[1] ^ b[1];
@@ -91,18 +123,80 @@ void gfadd_words(uint8_t *a, uint8_t *b, uint8_t *c) {
  * 		 c_5 = a^3 b^2 + a^2 b^1 + a^1 b^0
  * 				...
  * 		 c_0 = a^0 b^0
- * This product is reduced by applying mod(x^4 + 1)
+ * This product is reduced by applying mod (x^4 + 1)
  *
- * Inset matrix product representation here
+ * Insert matrix product representation here
  */
-void gfmul_words(uint8_t a[], uint8_t b[], uint8_t c[]) {
+
+void gfmul_words(const uint8_t* a, uint8_t* b, uint8_t* c) {
 	c[0] = gfmul(a[0], b[0]) ^ gfmul(a[3], b[1]) ^ gfmul(a[2], b[2]) ^ gfmul(a[1], b[3]);
 	c[1] = gfmul(a[1], b[0]) ^ gfmul(a[0], b[1]) ^ gfmul(a[3], b[2]) ^ gfmul(a[2], b[3]);
 	c[2] = gfmul(a[2], b[0]) ^ gfmul(a[1], b[1]) ^ gfmul(a[0], b[2]) ^ gfmul(a[3], b[3]);
 	c[3] = gfmul(a[3], b[0]) ^ gfmul(a[2], b[1]) ^ gfmul(a[1], b[2]) ^ gfmul(a[0], b[3]);
 }
 
-void SubBytes() {}
+/* The S-Box table is generated from the affine transformation of the multiplicative inverse of uint8_t b(x), b^{-1}(x),
+ * in the field with 0x11b as the irreducible polynomial same as before.
+ *
+ * Using a lookup table as recommended by forums, since calculating at run-time is vulnerable to side-channel attacks like timing attacks.
+ *
+ * The lookup table is is composed of rows that are located by the most significant nibble and columns by least significant nibble.
+ * For example, 0x3f, the row number is 0x3, and column is 0xf.
+ *
+ * The most significant nibble is extracted by: (x >> 4) & 0xf
+ * And the least significant nibble by: (x) & 0xf
+ */
+
+static void SubBytes(uint8_t stateArray[]) {
+	for (int i = 0; i < N_b*4; i++) {
+		uint8_t toSub = stateArray[i];
+		stateArray[i] = sbox[((toSub >> 4) & 0xf) * 0x10 + toSub & 0xf]; // GET_ELEM(sbox, (toSub>>4)&0xf, toSub&0xf, 0x10)
+	}
+}
+
+/* The last three rows of the state array are cyclically shifted by a factor r, which in this case is the row index.
+ * The cyclic shift is performed in left order, i.e. the left bytes are wrapped around and moved to the end of array in order of removal or like a stack.
+ * The transformation can be represented by s_{i, j} = s'_{i, (j + shift(i, N_b)) mod (N_b)}
+ */
+
+static void ShiftRows(uint8_t stateArray[]) {
+	for (int i = 1; i < 4; i++) {					// Move through the last three rows, 0 < i < 4, since s_{i, j} = s'_{i, (j + shift(i, N_b)) mod (N_b)} at i = 0 has no effect. See definition for shift(r, N_b).
+
+		uint8_t temp[N_b];							// Temporary array to store current row
+
+		for (int j = 0; j < N_b; j++) {            	// Move across the columns in each row, 0 <= j < N_b, and fill the temp array
+			temp[j] = getStateArr(stateArray, N_b, i, j);
+		}
+
+		for (int j = 0; j < N_b; j++) {				// Cyclically move through the temp array by an offset of i, i.e. row number and allocate to the stateArray's current row
+			getStateArr(stateArray, N_b, i, j) = temp[(j + shift(i, N_b)) % N_b];
+		}
+	}
+}
+
+/* Each column in the state array is treated as polynomial over GF(2^8) with the coefficients itself in GF(2^8), the coefficient are uint8_t (1 byte = 8 bit) each
+ * thus the whole polynomial is 32 bits or uint32_t. This column array is multiplied by a fixed polynomial a(x) = {03}x^3 + {01}x^2 + {01}x + {02}, under modulo x^4 + 1.
+ * This product is shown in gfmul_words.
+ * Each column (32 bit word) is replaced by its transformation (the product array).
+ */
+
+static void MixColumns(uint8_t stateArray[]) {
+	uint8_t polyProd[4];
+	static const uint8_t a_x[] = {0x2, 0x1, 0x1, 0x3};
+	for (int i = 0; i < N_b; i++) {					// Iterating through columns
+		uint8_t tempColumn[4];
+		for (int j = 0; j < 4; j++) {				// Iterating through rows
+			tempColumn[j] = getStateArr(stateArray, N_b, i, j);		// Storing the column array in a temp array
+		}
+		gfmul_words(a_x, tempColumn, polyProd);				// Product of the polynomial mod x^4 + 1
+		for (int j = 0; j < 4; j++) {				// Iterating through the product and substituting in the stateArray's column
+			getStateArr(stateArray, N_b, i, j) = polyProd[j];
+		}
+	}
+}
+
+static void AddRoundKey() {}
+
 
 int main(int argc, char **argv) {    /*
 	if (argc < 3) {
@@ -113,7 +207,17 @@ int main(int argc, char **argv) {    /*
 		printf("Polynomial multiplication in GF(2^8):\n\t {%x} * {%x} = {%x}\n", x, y, gfmul(x,y)); 
 	}
  */
+
+	uint8_t state[] = { 1, 2, 3,4,
+						5, 6,7,8,
+						9, 10, 11, 12,
+						13, 14, 15, 16};
+
 	gentable();
+	print_table(state, 0x4);
+	ShiftRows(state);
+	printf("\n");
+	print_table(state, 0x4);
 	//printf("%x\n", gfmul(0x57, 0x83));
 	//printf("%x", xtime(xtime(0x57)));
 	return 0;
