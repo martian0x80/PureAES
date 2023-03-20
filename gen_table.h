@@ -8,6 +8,7 @@
 #include "aes.h"
 
 int gentable(void);
+
 void print_table(uint8_t arr[], uint8_t offset);
 
 #endif //AES_GEN_TABLE_H
