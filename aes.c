@@ -270,7 +270,7 @@ static void KeyExpansion(const uint8_t key[4 * N_k], uint32_t expandedKey[N_b * 
 	while (i < N_b * (N_r + 1)) {
 		uint32_t temp = expandedKey[i - 1];
 		if (i % N_k == 0) {
-			temp = SubWords(RotWord(temp)) ^ Rcon[i / N_k + 1];
+			temp = SubWords(RotWord(temp)) ^ Rcon[i / N_k - 1];
 		} else if ((N_k > 6) && (i % N_k == 4)) {
 			temp = SubWords(temp);
 		}
@@ -330,7 +330,7 @@ int main(int argc, char **argv) {    /*
 	int i = 0;
 	KeyExpansion(key, expandedKey);
 	while (i < N_b * (N_r + 1)) {
-		printf("0x%x, ", expandedKey[i]);
+		printf("i: %d [0x%x], ", i, expandedKey[i]);
 		i += 1;
 	}
 	printf("\nRotWord: %x\nSubWords: %x\nXorRcon: %x\nXor_w[i-N_k]: %x", RotWord(expandedKey[3]), SubWords(RotWord(expandedKey[3])), SubWords(RotWord(expandedKey[3])) ^ Rcon[0], (SubWords(RotWord(expandedKey[3])) ^ Rcon[0]) ^ expandedKey[0]);
