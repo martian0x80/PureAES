@@ -8,6 +8,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define AES_128_N_k 4
+#define AES_128_N_r 10
+
+#define AES_192_N_k 6
+#define AES_192_N_r 12
+
+#define AES_256_N_k 8
+#define AES_256_N_r 14
+
 // Extracting [i][j]th element from a two dimensional array represented as a one-dimensional array
 #define GET_ELEM(arr, i, j, n) (arr[n * i + j])
 

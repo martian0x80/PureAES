@@ -1,6 +1,7 @@
 // aes.x : This file contains the 'main' function. Program execution begins and ends there.
 //
 
+#include <memory.h>
 #include "aes.h"
 
 // Macro for the cyclic shift in ShiftRows
@@ -8,6 +9,9 @@
 
 // Helper macro to get the array at (i, j) th column, since the state array is one-dimensional
 #define getStateArr(arr, N_b, x, y) arr[x * N_b + y]
+
+// Helper macro to get the substitution byte for x. For debugging.
+#define getSBOX(x) sbox[((x >> 4) & 0xf) * 0x10 + (x & 0xf)]
 
 #define LITTLE_ENDIAN 1
 #define BIG_ENDIAN 0
@@ -29,14 +33,15 @@ static const unsigned char N_block = 0x4;
 static const unsigned char N_b = 0x4;
 
 // Key size/length, belongs in {4, 6, 8} words = {16, 24, 32} bytes = {128, 192, 256} bits
-const unsigned char N_k;
+const unsigned char N_k = 4;
 
 // Number of rounds, a function of N_k, belongs in {10, 12, 14}
-static const unsigned char N_r;
+static const unsigned char N_r = 0xa;
 
 // Reduction Irreducible polynomial GF(2^8)
 const uint16_t PP = 0x11b;
 
+static const uint32_t Rcon[10] = {0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000, 0x1b000000, 0x36000000};
 
 static const uint8_t sbox[256] =
 		{0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76, 0xca, 0x82,
@@ -144,6 +149,14 @@ void gfmul_words(const uint8_t *a, uint8_t *b, uint8_t *c) {
 	c[3] = gfmul(a[3], b[0]) ^ gfmul(a[2], b[1]) ^ gfmul(a[1], b[2]) ^ gfmul(a[0], b[3]);
 }
 
+/*
+ * 
+ */
+
+static uint32_t RotWord(uint32_t word) {
+	return ((word << 0x8) & 0xffffffff) | ((word >> 0x18) & 0xff);
+}
+
 /* The S-Box table is generated from the affine transformation of the multiplicative inverse of uint8_t b(x), b^{-1}(x),
  * in the field with 0x11b as the irreducible polynomial same as before.
  *
@@ -169,6 +182,7 @@ static uint32_t SubWords(uint32_t word) {
 	for (int i = 0; i < 4; i++) {
 		uint8_t toSub = (word >> (i * 8)) & 0xff;
 		// I had to smash my brain into gdb to figure out that + has higher precedence than & operator, also the endianness, fuck me
+		// The left and right shift operations are independent of the byte order of the system, but *(uint32_t*) is not.
 		subWord[ENDIANNESS ? i : 3 - i] = sbox[((toSub >> 4) & 0xf) * 0x10 + (toSub & 0xf)]; // GET_ELEM(sbox, (toSub>>4)&0xf, toSub&0xf, 0x10)
 	}
 	return *(uint32_t *)subWord;
@@ -205,10 +219,10 @@ static void ShiftRows(uint8_t stateArray[]) {
  */
 
 static void MixColumns(uint8_t stateArray[]) {
-	uint8_t polyProd[4];
 	static const uint8_t a_x[] = {0x2, 0x1, 0x1, 0x3};
 	// We are essentially doing three operations consecutively, first being extracting the column array or word, and then applying the transformation, and in the end storing it back in place
 	for (int i = 0; i < N_b; i++) {                    // Iterating through columns
+		uint8_t polyProd[4];
 		uint8_t tempColumn[4];
 		for (int j = 0; j < 4; j++) {                // Iterating through rows
 			tempColumn[j] = getStateArr(stateArray, N_b, i, j);        // Storing the column array in a temp array
@@ -221,25 +235,49 @@ static void MixColumns(uint8_t stateArray[]) {
 	}
 }
 
-static void AddRoundKey(uint8_t stateArray[]) {
+/*
+ * Remove unnecessary loops, and steps
+ */
 
+static void AddRoundKey(uint8_t stateArray[], uint32_t roundKeys[]) {
+	for (int i = 0; i < N_b; i++) {                    // Iterating through columns
+		uint8_t addedKey[4];
+		uint8_t tempColumn[4];
+		uint8_t roundkeyArray[4] = {(roundKeys[i] >> 24) & 0xff, (roundKeys[i] >> 16) & 0xff, (roundKeys[i] >> 8) & 0xff, (roundKeys[i]) & 0xff};
+		for (int j = 0; j < 4; j++) {                // Iterating through rows
+
+			uint8_t *elSt = &getStateArr(stateArray, N_b, i, j);        //
+			*elSt = *elSt ^ roundkeyArray[j];
+		}
+		/* Just in case
+		gfadd_words(tempColumn, roundkeyArray, addedKey);                //
+		for (int j = 0;
+			 j < 4; j++) {                // Iterating through the _ and substituting in the stateArray's column
+			getStateArr(stateArray, N_b, i, j) = addedKey[j];
+		*/
+	}
 }
 
-static void KeyExpansion(uint8_t key[4*N_k], uint32_t expandedKey[N_b * (N_r + 1)]) {
+static void KeyExpansion(const uint8_t key[4 * N_k], uint32_t expandedKey[N_b * (N_r + 1)]) {
 	int i = 0;
-	// wrong,
 	while (i < N_k) {
-		expandedKey[i] = *(uint32_t *)&key[4 * i];
+		expandedKey[i] = (key[4 * i] << 24) | (key[4 * i + 1] << 16) | (key[4 * i + 2] << 8) | key[4 * i + 3];
+		//expandedKey[i] = *(uint32_t *)&key[4 * i];
 		i += 1;
 	} // i = N_k
 	while (i < N_b * (N_r + 1)) {
 		uint32_t temp = expandedKey[i-1];
 		if (i % N_k == 0) {
-//			temp = Sub
+			temp = SubWords(RotWord(temp)) ^ Rcon[i/N_k + 1];
+		} else if ((N_k > 6) && (i % N_k == 4)) {
+			temp = SubWords(temp);
 		}
+		expandedKey[i] = expandedKey[i - N_k] ^ temp;
+		i += 1;
 	}
-
 }
+
+
 
 
 int main(int argc, char **argv) {    /*
@@ -263,14 +301,14 @@ int main(int argc, char **argv) {    /*
 	printf("\n");
 	print_table(state, 0x4);
 	printf("\n%x\t=\t%x\n", 0x11223344, SubWords(0x11223344));
-	SubBytes(state);
+	//SubBytes(state);
 	print_table(state, 0x4);
-	printf("%d", ENDIANNESS);
-	uint32_t expandedKey[4];
+	printf("%d\n", ENDIANNESS);
+	uint32_t expandedKey[N_b * (N_r + 1)];
 	int i = 0;
-	while (i < 4) {
-		expandedKey[i] = *(uint32_t *)&state[4 * i];
-		printf("%x\t", expandedKey[i]);
+	KeyExpansion(state, expandedKey);
+	while (i < N_b * (N_r + 1)) {
+		printf("0x%x, ", expandedKey[i]);
 		i += 1;
 	}
 
