@@ -39,10 +39,12 @@ void write_table(uint8_t arr[], FILE *fstream_s) {
 }
 
 void print_table(uint8_t arr[], uint8_t colSize) {
+	printf("\n");
 	for (int i = 0; i < colSize; i++) {
 		for (int j = 0; j < colSize; j++) {
 			printf("%x, ", arr[colSize * (i) + j]);
 		}
 		printf("\n");
 	}
+	printf("\n");
 }
