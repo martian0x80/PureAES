@@ -32,10 +32,10 @@ static const unsigned char N_block = 0x4;
 static const unsigned char N_b = 0x4;
 
 // Key size/length, belongs in {4, 6, 8} words = {16, 24, 32} bytes = {128, 192, 256} bits
-const unsigned char N_k = 4;
+unsigned char N_k = 4;
 
 // Number of rounds, a function of N_k, belongs in {10, 12, 14}
-static const unsigned char N_r = 0xa;
+static unsigned char N_r = 0xa;
 
 // Reduction Irreducible polynomial GF(2^8)
 const uint16_t PP = 0x11b;
@@ -241,14 +241,14 @@ static void MixColumns(uint8_t stateArray[]) {
  * Remove unnecessary loops, and steps
  */
 
-static void AddRoundKey(uint8_t stateArray[], uint32_t roundKeys[]) {
+static void AddRoundKey(uint8_t stateArray[], const uint32_t roundKeys[]) {
 	for (int i = 0; i < N_b; i++) {                    // Iterating through columns
 		//uint8_t addedKey[4];
 		//uint8_t tempColumn[4];
 		uint8_t roundkeyArray[4] = {(roundKeys[i] >> 24) & 0xff, (roundKeys[i] >> 16) & 0xff,
 									(roundKeys[i] >> 8) & 0xff, (roundKeys[i]) & 0xff};
 		for (int j = 0; j < 4; j++) {                // Iterating through rows
-			uint8_t *elSt = &getStateArr(stateArray, N_b, i, j);        //
+			uint8_t *elSt = &getStateArr(stateArray, N_b, j, i);        // (j, i) because we are iterating through the column in the state array
 			*elSt = *elSt ^ roundkeyArray[j];
 		}
 		/* Just in case
@@ -279,13 +279,13 @@ static void KeyExpansion(const uint8_t key[4 * N_k], uint32_t expandedKey[N_b * 
 	}
 }
 
-static uint8_t *CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[N_b * (N_r + 1)]) {
+static uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[N_b * (N_r + 1)]) {
 	uint32_t w[N_b];
 	for (int i = 0; i < N_b; i++) {
 		w[i] = roundKeys[i];
 	}
 	AddRoundKey(stateArray, w);
-
+	print_table(stateArray, 4);
 	for (int i = 1; i < N_r; i++) {
 		SubBytes(stateArray);
 		ShiftRows(stateArray);
@@ -294,6 +294,7 @@ static uint8_t *CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[N_b
 			w[j - i * N_b] = roundKeys[j];
 		}
 		AddRoundKey(stateArray, w);
+		print_table(stateArray, 4);
 	}
 	for (int j = N_r * N_b; j < (N_r + 1) * N_b; j++) {
 		w[j - N_r * N_b] = roundKeys[j];
@@ -314,18 +315,26 @@ int main(int argc, char **argv) {    /*
 		printf("Polynomial multiplication in GF(2^8):\n\t {%x} * {%x} = {%x}\n", x, y, gfmul(x,y)); 
 	}
  */
+	N_k = 4;
+	N_r = 0xa;
 
-	uint8_t state[] = {
-			1, 2, 3, 4,
-			5, 6, 7, 8,
-			9, 10, 11, 12,
-			13, 14, 15, 16};
+	uint8_t in[] = {
+			0x32, 0x43, 0xf6, 0xa8,
+			0x88, 0x5a, 0x30, 0x8d,
+			0x31, 0x31, 0x98, 0xa2,
+			0xe0, 0x37, 0x07, 0x34};
+	uint8_t stateArr[16];
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			stateArr[j * N_b + i] = in[i * N_b + j];
+		}
+	}
+	print_table(stateArr, 4);
 	uint8_t key[] = {
 			0x2b, 0x7e, 0x15, 0x16,
 			0x28, 0xae, 0xd2, 0xa6,
-			0xab, 0xf7, 0x15, 0x88,
+			0xab, 0xf7, 0x15,0x88,
 			0x09, 0xcf, 0x4f, 0x3c};
-
 	uint32_t expandedKey[N_b * (N_r + 1)];
 	int i = 0;
 	KeyExpansion(key, expandedKey);
@@ -333,8 +342,10 @@ int main(int argc, char **argv) {    /*
 		printf("i: %d [0x%x], ", i, expandedKey[i]);
 		i += 1;
 	}
-	printf("\nRotWord: %x\nSubWords: %x\nXorRcon: %x\nXor_w[i-N_k]: %x", RotWord(expandedKey[3]), SubWords(RotWord(expandedKey[3])), SubWords(RotWord(expandedKey[3])) ^ Rcon[0], (SubWords(RotWord(expandedKey[3])) ^ Rcon[0]) ^ expandedKey[0]);
 
+	printf("\nRotWord: %x\nSubWords: %x\nXorRcon: %x\nXor_w[i-N_k]: %x\n", RotWord(expandedKey[3]), SubWords(RotWord(expandedKey[3])), SubWords(RotWord(expandedKey[3])) ^ Rcon[0], (SubWords(RotWord(expandedKey[3])) ^ Rcon[0]) ^ expandedKey[0]);
+
+	print_table(CipherEncrypt(stateArr, expandedKey), N_b);
 
 	//printf("%x\n", gfmul(0x57, 0x83));
 	//printf("%x", xtime(xtime(0x57)));

@@ -34,6 +34,6 @@ uint8_t gfmul(uint8_t x, uint8_t y);
  */
 int gentable(void);
 
-void print_table(uint8_t *, uint8_t);
+void print_table(uint8_t * arr, uint8_t colSize);
 
 #endif //AES_AES_H
