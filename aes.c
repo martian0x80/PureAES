@@ -2,6 +2,7 @@
 //
 
 #include "aes.h"
+#include "constants.h"
 
 // Macro for the cyclic shift in ShiftRows
 #define shift(r, N_b) r
@@ -32,10 +33,13 @@ static const unsigned char N_block = 0x4;
 static const unsigned char N_b = 0x4;
 
 // Key size/length, belongs in {4, 6, 8} words = {16, 24, 32} bytes = {128, 192, 256} bits
-unsigned char N_k = 4;
+
+#ifndef N_k
+#define N_k 4
+#endif
 
 // Number of rounds, a function of N_k, belongs in {10, 12, 14}
-static unsigned char N_r = 0xa;
+static const unsigned char N_r =  AES_N_r(N_k);
 
 // Reduction Irreducible polynomial GF(2^8)
 const uint16_t PP = 0x11b;
@@ -227,12 +231,12 @@ static void MixColumns(uint8_t stateArray[]) {
 		uint8_t polyProd[4];
 		uint8_t tempColumn[4];
 		for (int j = 0; j < 4; j++) {                // Iterating through rows
-			tempColumn[j] = getStateArr(stateArray, N_b, i, j);        // Storing the column array in a temp array
+			tempColumn[j] = getStateArr(stateArray, N_b, j, i);        // Storing the column array in a temp array
 		}
 		gfmul_words(a_x, tempColumn, polyProd);                // Product of the polynomial mod x^4 + 1
 		for (int j = 0;
 			 j < 4; j++) {                // Iterating through the product and substituting in the stateArray's column
-			getStateArr(stateArray, N_b, i, j) = polyProd[j];
+			getStateArr(stateArray, N_b, j, i) = polyProd[j];
 		}
 	}
 }
@@ -260,7 +264,7 @@ static void AddRoundKey(uint8_t stateArray[], const uint32_t roundKeys[]) {
 	}
 }
 
-static void KeyExpansion(const uint8_t key[4 * N_k], uint32_t expandedKey[N_b * (N_r + 1)]) {
+void KeyExpansion(const uint8_t key[4 * N_k], uint32_t expandedKey[N_b * (N_r + 1)]) {
 	int i = 0;
 	while (i < N_k) {
 		expandedKey[i] = (key[4 * i] << 24) | (key[4 * i + 1] << 16) | (key[4 * i + 2] << 8) | key[4 * i + 3];
@@ -279,7 +283,7 @@ static void KeyExpansion(const uint8_t key[4 * N_k], uint32_t expandedKey[N_b * 
 	}
 }
 
-static uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[N_b * (N_r + 1)]) {
+uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[N_b * (N_r + 1)]) {
 	uint32_t w[N_b];
 	for (int i = 0; i < N_b; i++) {
 		w[i] = roundKeys[i];
@@ -315,8 +319,8 @@ int main(int argc, char **argv) {    /*
 		printf("Polynomial multiplication in GF(2^8):\n\t {%x} * {%x} = {%x}\n", x, y, gfmul(x,y)); 
 	}
  */
-	N_k = 4;
-	N_r = 0xa;
+//	N_k = 4;
+//	N_r = 0xa;
 
 	uint8_t in[] = {
 			0x32, 0x43, 0xf6, 0xa8,
