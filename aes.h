@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define AES_N_r(N_k) \
     ((N_k == AES_128_N_k) ? AES_128_N_r : \
@@ -20,17 +21,29 @@
 /*
  * Functions from aes.c
  */
+
 extern const uint16_t PP;
 
 uint8_t gfadd(uint8_t x, uint8_t y);
 
 uint8_t gfmul(uint8_t x, uint8_t y);
 
+void KeyExpansion(const uint8_t key[], uint32_t expandedKey[]);
+
+uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]);
+
 /*
- * Other
+ * Other helper functions
  */
+
 int gentable(void);
 
-void print_table(uint8_t * arr, uint8_t colSize);
+void print_table(uint8_t * arr, uint8_t colSize, uint8_t rowSize);
+
+void hexify(const char* hexStr, uint8_t* byteArr, size_t byteArrLen);
+
+void xprintf(const uint8_t* byteArr, size_t byteArrLen);
+
+void transpose(uint8_t* in);
 
 #endif //AES_AES_H

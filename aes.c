@@ -35,7 +35,7 @@ static const unsigned char N_b = 0x4;
 // Key size/length, belongs in {4, 6, 8} words = {16, 24, 32} bytes = {128, 192, 256} bits
 
 #ifndef N_k
-#define N_k 4
+#define N_k 8
 #endif
 
 // Number of rounds, a function of N_k, belongs in {10, 12, 14}
@@ -264,7 +264,7 @@ static void AddRoundKey(uint8_t stateArray[], const uint32_t roundKeys[]) {
 	}
 }
 
-void KeyExpansion(const uint8_t key[4 * N_k], uint32_t expandedKey[N_b * (N_r + 1)]) {
+void KeyExpansion(const uint8_t key[], uint32_t expandedKey[]) {
 	int i = 0;
 	while (i < N_k) {
 		expandedKey[i] = (key[4 * i] << 24) | (key[4 * i + 1] << 16) | (key[4 * i + 2] << 8) | key[4 * i + 3];
@@ -283,74 +283,104 @@ void KeyExpansion(const uint8_t key[4 * N_k], uint32_t expandedKey[N_b * (N_r + 
 	}
 }
 
-uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[N_b * (N_r + 1)]) {
+uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]) {
 	uint32_t w[N_b];
 	for (int i = 0; i < N_b; i++) {
 		w[i] = roundKeys[i];
 	}
+//	printf("round[0].start = ");
+//	print_table(stateArray, 4);
+
 	AddRoundKey(stateArray, w);
-	print_table(stateArray, 4);
-	for (int i = 1; i < N_r; i++) {
+//	printf("round[0].k_sch = ");
+//	print_table(stateArray, 4);
+	int i;
+	for (i = 1; i < N_r; i++) {
+
+//		printf("round[%d].start = ", i);
+//		print_table(stateArray, 4);
+
 		SubBytes(stateArray);
+//		printf("round[%d].s_box = ", i);
+//		print_table(stateArray, 4);
+
 		ShiftRows(stateArray);
+//		printf("round[%d].s_row = ", i);
+//		print_table(stateArray, 4);
+
 		MixColumns(stateArray);
+//		printf("round[%d].s_col = ", i);
+//		print_table(stateArray, 4);
+
 		for (int j = i * N_b; j < (i + 1) * N_b; j++) {
 			w[j - i * N_b] = roundKeys[j];
 		}
 		AddRoundKey(stateArray, w);
-		print_table(stateArray, 4);
+//		printf("round[%d].k_sch = ", i);
+//		print_table(stateArray, 4);
 	}
 	for (int j = N_r * N_b; j < (N_r + 1) * N_b; j++) {
 		w[j - N_r * N_b] = roundKeys[j];
 	}
 	SubBytes(stateArray);
+//	printf("round[%d].s_box = ", i);
+//	print_table(stateArray, 4);
+
 	ShiftRows(stateArray);
+//	printf("round[%d].s_row = ", i);
+//	print_table(stateArray, 4);
+
 	AddRoundKey(stateArray, w);
+//	printf("round[%d].k_sch = ", i);
+//	print_table(stateArray, 4);
+
 	return (uint8_t *) stateArray;
 }
 
 
-int main(int argc, char **argv) {    /*
-	if (argc < 3) {
-		printf("Insufficient args.\n");
-	} else {
-		int x = (int)strtol(argv[1], NULL, 16);
-		int y = (int)strtol(argv[2], NULL, 16);
-		printf("Polynomial multiplication in GF(2^8):\n\t {%x} * {%x} = {%x}\n", x, y, gfmul(x,y)); 
-	}
- */
-//	N_k = 4;
-//	N_r = 0xa;
-
+int main(int argc, char **argv) {
+/*
 	uint8_t in[] = {
 			0x32, 0x43, 0xf6, 0xa8,
 			0x88, 0x5a, 0x30, 0x8d,
 			0x31, 0x31, 0x98, 0xa2,
 			0xe0, 0x37, 0x07, 0x34};
-	uint8_t stateArr[16];
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			stateArr[j * N_b + i] = in[i * N_b + j];
-		}
-	}
-	print_table(stateArr, 4);
+
 	uint8_t key[] = {
 			0x2b, 0x7e, 0x15, 0x16,
 			0x28, 0xae, 0xd2, 0xa6,
 			0xab, 0xf7, 0x15,0x88,
 			0x09, 0xcf, 0x4f, 0x3c};
+
+ */
+
+
+	char hexstring[] = "00112233445566778899aabbccddeeff";
+	char keystring[] = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+
+	uint8_t stateArr[16];
+	hexify(hexstring, stateArr, (size_t)16);
+	transpose(stateArr);
+	print_table(stateArr, 4, 4);
+
+	uint8_t key[strlen(keystring)/2];
+	hexify(keystring, key, strlen(keystring)/2);
+	print_table(key, 4, strlen(keystring)/8);
+
 	uint32_t expandedKey[N_b * (N_r + 1)];
-	int i = 0;
+
 	KeyExpansion(key, expandedKey);
+
+	/*	 Print the round keys
+	int i = 0;
 	while (i < N_b * (N_r + 1)) {
 		printf("i: %d [0x%x], ", i, expandedKey[i]);
 		i += 1;
 	}
-
-	printf("\nRotWord: %x\nSubWords: %x\nXorRcon: %x\nXor_w[i-N_k]: %x\n", RotWord(expandedKey[3]), SubWords(RotWord(expandedKey[3])), SubWords(RotWord(expandedKey[3])) ^ Rcon[0], (SubWords(RotWord(expandedKey[3])) ^ Rcon[0]) ^ expandedKey[0]);
-
-	print_table(CipherEncrypt(stateArr, expandedKey), N_b);
-
+	*/
+//	printf("round[10].output = ");
+	print_table(CipherEncrypt(stateArr, expandedKey), N_b, 4);
+	xprintf(stateArr, 16);
 	//printf("%x\n", gfmul(0x57, 0x83));
 	//printf("%x", xtime(xtime(0x57)));
 	return 0;
