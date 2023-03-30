@@ -157,8 +157,8 @@ void gfmul_words(const uint8_t *a, uint8_t *b, uint8_t *c) {
  * 
  */
 
-static uint32_t RotWord(uint32_t word) {
-	return ((word << 0x8) & 0xffffffff) | ((word >> 0x18) & 0xff);
+static uint32_t RotWord(uint32_t word) { 		// Cyclic left shift
+	return ((word << 0x8) & 0xffffffff) | ((word >> 0x18) & 0x000000ff);
 }
 
 /* The S-Box table is generated from the affine transformation of the multiplicative inverse of uint8_t b(x), b^{-1}(x),
@@ -216,6 +216,18 @@ static void ShiftRows(uint8_t stateArray[]) {
 			getStateArr(stateArray, N_b, i, j) = temp[(j + shift(i, N_b)) % N_b];
 		}
 	}
+// Alternative way I wanted to write because it was easier
+/*
+	for (int i = 1; i < 4; i++) {
+		// Arrays are not affected by endianness, thus they are stored as big-endian
+		uint32_t row = (stateArray[4 * i] << 24) | (stateArray[4 * i + 1] << 16) | (stateArray[4 * i + 2] << 8) | stateArray[4 * i + 3];
+		uint32_t rotatedRow = ((row << 0x8 * i) & 0xffffffff) | ((row >> (0x20 - (0x8 * i))) & 0xffffffff);
+		stateArray[4 * i] = (rotatedRow >> 24) & 0xff;
+		stateArray[4 * i + 1] = (rotatedRow >> 16) & 0xff;
+		stateArray[4 * i + 2] = (rotatedRow >> 8) & 0xff;
+		stateArray[4 * i + 3] = rotatedRow & 0xff;
+	}
+ */
 }
 
 /* Each column in the state array is treated as polynomial over GF(2^8) with the coefficients itself in GF(2^8), the coefficient are uint8_t (1 byte = 8 bit) each
@@ -249,6 +261,7 @@ static void AddRoundKey(uint8_t stateArray[], const uint32_t roundKeys[]) {
 	for (int i = 0; i < N_b; i++) {                    // Iterating through columns
 		//uint8_t addedKey[4];
 		//uint8_t tempColumn[4];
+		// Converting word to uint8_t bytes
 		uint8_t roundkeyArray[4] = {(roundKeys[i] >> 24) & 0xff, (roundKeys[i] >> 16) & 0xff,
 									(roundKeys[i] >> 8) & 0xff, (roundKeys[i]) & 0xff};
 		for (int j = 0; j < 4; j++) {                // Iterating through rows
@@ -267,6 +280,7 @@ static void AddRoundKey(uint8_t stateArray[], const uint32_t roundKeys[]) {
 void KeyExpansion(const uint8_t key[], uint32_t expandedKey[]) {
 	int i = 0;
 	while (i < N_k) {
+		// Converting 4 bytes from key into a word one at a time to form the initial round keys, works on rows not columns
 		expandedKey[i] = (key[4 * i] << 24) | (key[4 * i + 1] << 16) | (key[4 * i + 2] << 8) | key[4 * i + 3];
 		//expandedKey[i] = *(uint32_t *)&key[4 * i];
 		i += 1;
@@ -338,6 +352,61 @@ uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]) {
 }
 
 
+static void InvShiftRows(uint8_t stateArray[]) {
+
+	for (int i = 1; i <
+					4; i++) {                    // Move through the last three rows, 0 < i < 4, since s_{i, j} = s'_{i, (j + shift(i, N_b)) mod (N_b)} at i = 0 has no effect. See definition for shift(r, N_b).
+
+		uint8_t temp[N_b];                            // Temporary array to store current row
+
+		for (int j = 0; j <
+						N_b; j++) {                // Move across the columns in each row, 0 <= j < N_b, and fill the temp array
+			temp[j] = getStateArr(stateArray, N_b, i, j);
+		}
+
+		for (int j = 0; j <
+						N_b; j++) {                // Cyclically move through the temp array by an offset of (N_b - i), i.e. row number and allocate to the stateArray's current row
+			getStateArr(stateArray, N_b, i, j) = temp[(j + (N_b - shift(i, N_b))) % N_b]; // Had a hard time figuring this out, I am dumb
+		}
+	}
+/*
+	for (int i = 1; i < 4; i++) {
+		// Arrays are not affected by endianness, thus they are stored as big-endian
+		uint32_t row = (stateArray[4 * i] << 24) | (stateArray[4 * i + 1] << 16) | (stateArray[4 * i + 2] << 8) | stateArray[4 * i + 3];
+		uint32_t rotatedRow = ((row >> 0x8 * i) & 0xffffffff) | ((row << (0x20 - (0x8 * i))) & 0xffffffff);
+		stateArray[4 * i] = (rotatedRow >> 24) & 0xff;
+		stateArray[4 * i + 1] = (rotatedRow >> 16) & 0xff;
+		stateArray[4 * i + 2] = (rotatedRow >> 8) & 0xff;
+		stateArray[4 * i + 3] = rotatedRow & 0xff;
+	}
+*/
+}
+
+static void InvSubBytes(uint8_t stateArray[]) {
+	for (int i = 0; i < N_b * 4; i++) {
+		uint8_t toSub = stateArray[i];
+		stateArray[i] = inv_sbox[((toSub >> 4) & 0xf) * 0x10 +
+							 (toSub & 0xf)]; // GET_ELEM(sbox, (toSub>>4)&0xf, toSub&0xf, 0x10)
+	}
+}
+
+static void InvMixColumns(uint8_t stateArray[]) {
+	static const uint8_t a_x_inv[] = {0x0b, 0x0d, 0x09, 0x0e};
+	// We are essentially doing three operations consecutively, first being extracting the column array or word, and then applying the transformation, and in the end storing it back in place
+	for (int i = 0; i < N_b; i++) {                    // Iterating through columns
+		uint8_t polyProd[4];
+		uint8_t tempColumn[4];
+		for (int j = 0; j < 4; j++) {                // Iterating through rows
+			tempColumn[j] = getStateArr(stateArray, N_b, j, i);        // Storing the column array in a temp array
+		}
+		gfmul_words(a_x_inv, tempColumn, polyProd);                // Product of the polynomial mod x^4 + 1
+		for (int j = 0;
+			 j < 4; j++) {                // Iterating through the product and substituting in the stateArray's column
+			getStateArr(stateArray, N_b, j, i) = polyProd[j];
+		}
+	}
+}
+
 int main(int argc, char **argv) {
 /*
 	uint8_t in[] = {
@@ -361,6 +430,8 @@ int main(int argc, char **argv) {
 	uint8_t stateArr[16];
 	hexify(hexstring, stateArr, (size_t)16);
 	transpose(stateArr);
+	print_table(stateArr, 4, 4);
+	InvShiftRows(stateArr);
 	print_table(stateArr, 4, 4);
 
 	uint8_t key[strlen(keystring)/2];
