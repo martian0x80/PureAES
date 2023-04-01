@@ -3,7 +3,7 @@
 uint8_t gfaddTable[0xff * 0xff];
 uint8_t gfmulTable[0xff * 0xff];
 
-void print_table(uint8_t arr[], uint8_t colSize, uint8_t rowSize);
+void print_table(uint8_t arr[], uint8_t colSize, uint8_t rowSize, char *string);
 
 void write_table(uint8_t arr[], FILE *fstream_s);
 
@@ -38,8 +38,8 @@ void write_table(uint8_t arr[], FILE *fstream_s) {
 	}
 }
 
-void print_table(uint8_t arr[], uint8_t colSize, uint8_t rowSize) {
-	printf("\n");
+void print_table(uint8_t arr[], uint8_t colSize, uint8_t rowSize, char *string) {
+	printf("%s\n", string);
 	for (int i = 0; i < rowSize; i++) {
 		for (int j = 0; j < colSize; j++) {
 			printf("%x, ", arr[colSize * (i) + j]);
