@@ -32,6 +32,10 @@ void KeyExpansion(const uint8_t key[], uint32_t expandedKey[]);
 
 void CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]);
 
+void InverseCipher(uint8_t stateArray[], const uint32_t roundKeys[]);
+
+void EqInverseCipher(uint8_t stateArray[], const uint32_t droundKeys[]);
+
 /*
  * Other helper functions
  */
