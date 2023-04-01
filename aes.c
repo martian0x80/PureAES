@@ -428,7 +428,7 @@ static void InvMixColumns(uint8_t stateArray[]) {
  */
 
 static void EqInvMixColumns(uint32_t roundKeys[]) {
-	static const uint8_t a_x_inv[] = {0x0b, 0x0d, 0x09, 0x0e};
+	static const uint8_t a_x_inv[] = {0x0e, 0x09, 0x0d, 0x0b};
 	// We are essentially doing three operations consecutively, first being extracting the column array or word, and then applying the transformation, and in the end storing it back in place
 	for (int i = 0; i < N_b; i++) {                    // Iterating through columns
 		uint8_t polyProd[4];
@@ -524,9 +524,9 @@ void EqInverseCipher(uint8_t stateArray[], const uint32_t droundKeys[]) {
 	}
 	AddRoundKey(stateArray, dw);
 
-	for (int i = N_r - 1; i > 0; i++) {
+	for (int i = N_r - 1; i > 0; i--) {
 		InvSubBytes(stateArray);
-		InvSubBytes(stateArray);
+		InvShiftRows(stateArray);
 		InvMixColumns(stateArray);
 		for (int j = i * N_b; j < (i + 1) * N_b; j++) {
 			dw[j - i * N_b] = droundKeys[j];
@@ -589,10 +589,16 @@ int main(int argc, char **argv) {
 	print_table(stateArr, 4, 4, "EncryptCipher:");
 
 	/*
+	 * Key expansion routine for decryption in case of EqInverseCipher
+	 */
+	uint32_t dexpandedKey[N_b * (N_r + 1)];
+	EqKeyExpansion(key, dexpandedKey);
+
+	/*
 	 * Decryption
 	 */
-	InverseCipher(stateArr, expandedKey);
-	print_table(stateArr, 4, 4, "InverseCipher:");
+	EqInverseCipher(stateArr, dexpandedKey);
+	print_table(stateArr, 4, 4, "EqInverseCipher:");
 
 	/*	 Print the round keys
 	int i = 0;
