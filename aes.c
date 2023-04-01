@@ -315,7 +315,7 @@ void KeyExpansion(const uint8_t key[], uint32_t expandedKey[]) {
 }
 
 
-uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]) {
+void CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]) {
 	uint32_t w[N_b];
 	for (int i = 0; i < N_b; i++) {
 		w[i] = roundKeys[i];
@@ -365,8 +365,6 @@ uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]) {
 	AddRoundKey(stateArray, w);
 //	printf("round[%d].k_sch = ", i);
 //	print_table(stateArray, 4);
-
-	return (uint8_t *) stateArray;
 }
 
 
@@ -409,7 +407,7 @@ static void InvSubBytes(uint8_t stateArray[]) {
 }
 
 static void InvMixColumns(uint8_t stateArray[]) {
-	static const uint8_t a_x_inv[] = {0x0b, 0x0d, 0x09, 0x0e};
+	static const uint8_t a_x_inv[] = {0x0e, 0x09, 0x0d, 0x0b};
 	// We are essentially doing three operations consecutively, first being extracting the column array or word, and then applying the transformation, and in the end storing it back in place
 	for (int i = 0; i < N_b; i++) {                    // Iterating through columns
 		uint8_t polyProd[4];
@@ -490,6 +488,7 @@ void InverseCipher(uint8_t stateArray[], const uint32_t roundKeys[]) {
 		w[i - N_r * N_b] = roundKeys[i];
 	}
 	AddRoundKey(stateArray, w);
+	print_table(stateArray, 4, 4, "round[0].k_sch = ");
 
 	for (int i = N_r - 1; i > 0; i--) {
 
@@ -562,20 +561,38 @@ int main(int argc, char **argv) {
 	char hexstring[] = "00112233445566778899aabbccddeeff";
 	char keystring[] = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 
+	/*
+	 * Initialization of state array
+	 */
 	uint8_t stateArr[16];
 	hexify(hexstring, stateArr, (size_t)16);
 	transpose(stateArr);
-	print_table(stateArr, 4, 4);
-	InvShiftRows(stateArr);
-	print_table(stateArr, 4, 4);
+	print_table(stateArr, 4, 4, "state:");
 
+	/*
+	 * Initialization of key
+	 */
 	uint8_t key[strlen(keystring)/2];
 	hexify(keystring, key, strlen(keystring)/2);
-	print_table(key, 4, strlen(keystring)/8);
+	print_table(key, 4, strlen(keystring) / 8, "key:");
 
+	/*
+	 * Key Expansion routine
+	 */
 	uint32_t expandedKey[N_b * (N_r + 1)];
-
 	KeyExpansion(key, expandedKey);
+
+	/*
+	 * Encryption
+	 */
+	CipherEncrypt(stateArr, expandedKey);
+	print_table(stateArr, 4, 4, "EncryptCipher:");
+
+	/*
+	 * Decryption
+	 */
+	InverseCipher(stateArr, expandedKey);
+	print_table(stateArr, 4, 4, "InverseCipher:");
 
 	/*	 Print the round keys
 	int i = 0;
@@ -585,7 +602,7 @@ int main(int argc, char **argv) {
 	}
 	*/
 //	printf("round[10].output = ");
-	print_table(CipherEncrypt(stateArr, expandedKey), N_b, 4);
+
 	xprintf(stateArr, 16);
 	//printf("%x\n", gfmul(0x57, 0x83));
 	//printf("%x", xtime(xtime(0x57)));

@@ -9,6 +9,6 @@
 
 int gentable(void);
 
-void print_table(uint8_t arr[], uint8_t colsize, uint8_t rowSize);
+void print_table(uint8_t arr[], uint8_t colsize, uint8_t rowSize, char *string);
 
 #endif //AES_GEN_TABLE_H

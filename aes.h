@@ -30,7 +30,7 @@ uint8_t gfmul(uint8_t x, uint8_t y);
 
 void KeyExpansion(const uint8_t key[], uint32_t expandedKey[]);
 
-uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]);
+void CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]);
 
 /*
  * Other helper functions
@@ -38,7 +38,7 @@ uint8_t* CipherEncrypt(uint8_t stateArray[], const uint32_t roundKeys[]);
 
 int gentable(void);
 
-void print_table(uint8_t * arr, uint8_t colSize, uint8_t rowSize);
+void print_table(uint8_t arr[], uint8_t colSize, uint8_t rowSize, char *string);
 
 void hexify(const char* hexStr, uint8_t* byteArr, size_t byteArrLen);
 
