@@ -24,22 +24,22 @@ union {
 #define ENDIANNESS ((unsigned int)endian.c[0] == 0x01 ? LITTLE_ENDIAN : BIG_ENDIAN)
 
 // 1 word = 4 bytes = 32 bits
-static const unsigned char N_w = 0x4;
+const unsigned char N_w = 0x4;
 
 // Block size in words (= 16 bytes = 128 bits), constant for all N_k sizes
-static const unsigned char N_block = 0x4;
+const unsigned char N_block = 0x4;
 
 // Number of columns in the state array
-static const unsigned char N_b = 0x4;
+const unsigned char N_b = 0x4;
 
 // Key size/length, belongs in {4, 6, 8} words = {16, 24, 32} bytes = {128, 192, 256} bits
-
+/*
 #ifndef N_k
 #define N_k 8
 #endif
-
+*/
 // Number of rounds, a function of N_k, belongs in {10, 12, 14}
-static const unsigned char N_r =  AES_N_r(N_k);
+//const unsigned char N_r = AES_N_r(N_k);
 
 // Reduction Irreducible polynomial GF(2^8)
 const uint16_t PP = 0x11b;
@@ -81,6 +81,7 @@ static const uint8_t invSbox[256] =
 		 0x60, 0x51, 0x7F, 0xA9, 0x19, 0xB5, 0x4A, 0x0D, 0x2D, 0xE5, 0x7A, 0x9F, 0x93, 0xC9, 0x9C, 0xEF,
 		 0xA0, 0xE0, 0x3B, 0x4D, 0xAE, 0x2A, 0xF5, 0xB0, 0xC8, 0xEB, 0xBB, 0x3C, 0x83, 0x53, 0x99, 0x61,
 		 0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D};
+
 /*
  * The addition of two elements in a finite field is achieved by adding the coefficients for the
  * corresponding powers in the polynomials for the two elements. The addition is performed with
@@ -174,7 +175,7 @@ void gfmul_words(const uint8_t *a, uint8_t *b, uint8_t *c) {
  * 
  */
 
-static uint32_t RotWord(uint32_t word) { 		// Cyclic left shift, this can be easily extended for n shifts
+static uint32_t RotWord(uint32_t word) {        // Cyclic left shift, this can be easily extended for n shifts
 	return ((word << 0x8) & 0xffffffff) | ((word >> 0x18) & 0x000000ff);
 }
 
@@ -282,7 +283,8 @@ static void AddRoundKey(uint8_t stateArray[], const uint32_t roundKeys[]) {
 		uint8_t roundkeyArray[4] = {(roundKeys[i] >> 24) & 0xff, (roundKeys[i] >> 16) & 0xff,
 									(roundKeys[i] >> 8) & 0xff, (roundKeys[i]) & 0xff};
 		for (int j = 0; j < 4; j++) {                // Iterating through rows
-			uint8_t *elSt = &getStateArr(stateArray, N_b, j, i);        // (j, i) because we are iterating through the column in the state array
+			uint8_t *elSt = &getStateArr(stateArray, N_b, j,
+										 i);        // (j, i) because we are iterating through the column in the state array
 			*elSt = *elSt ^ roundkeyArray[j];
 		}
 		/* Just in case
@@ -382,7 +384,8 @@ static void InvShiftRows(uint8_t stateArray[]) {
 
 		for (int j = 0; j <
 						N_b; j++) {                // Cyclically move through the temp array by an offset of (N_b - i), i.e. row number and allocate to the stateArray's current row
-			getStateArr(stateArray, N_b, i, j) = temp[(j + (N_b - shift(i, N_b))) % N_b]; // Had a hard time figuring this out, I am dumb
+			getStateArr(stateArray, N_b, i, j) = temp[(j + (N_b - shift(i, N_b))) %
+													  N_b]; // Had a hard time figuring this out, I am dumb
 		}
 	}
 /*
@@ -437,7 +440,8 @@ static void EqInvMixColumns(uint32_t roundKeys[]) {
 		// Could've just defined gfmul_words() to take uint32_t instead of uint8_t, but a lot of the code above depends on it
 		gfmul_words(a_x_inv, roundKeyArray, polyProd);                // Product of the polynomial mod x^4 + 1
 		// Stuffing it in back in the roundKeys array as a uint32_t (word)
-		roundKeys[i] = ((polyProd[0] << 24) & 0xffffffff) | ((polyProd[1] << 16) & 0xffffffff) | ((polyProd[2] << 8) & 0xffffffff) | polyProd[3] & 0xffffffff;
+		roundKeys[i] = ((polyProd[0] << 24) & 0xffffffff) | ((polyProd[1] << 16) & 0xffffffff) |
+					   ((polyProd[2] << 8) & 0xffffffff) | polyProd[3] & 0xffffffff;
 	}
 }
 
@@ -541,76 +545,3 @@ void EqInverseCipher(uint8_t stateArray[], const uint32_t droundKeys[]) {
 	AddRoundKey(stateArray, dw);
 }
 
-int main(int argc, char **argv) {
-/*
-	uint8_t in[] = {
-			0x32, 0x43, 0xf6, 0xa8,
-			0x88, 0x5a, 0x30, 0x8d,
-			0x31, 0x31, 0x98, 0xa2,
-			0xe0, 0x37, 0x07, 0x34};
-
-	uint8_t key[] = {
-			0x2b, 0x7e, 0x15, 0x16,
-			0x28, 0xae, 0xd2, 0xa6,
-			0xab, 0xf7, 0x15,0x88,
-			0x09, 0xcf, 0x4f, 0x3c};
-
- */
-
-
-	char hexstring[] = "00112233445566778899aabbccddeeff";
-	char keystring[] = "000102030405060708090a0b0c0d0e0f";
-
-	/*
-	 * Initialization of state array
-	 */
-	uint8_t stateArr[16];
-	hexify(hexstring, stateArr, (size_t)16);
-	transpose(stateArr);
-	print_table(stateArr, 4, 4, "state:");
-
-	/*
-	 * Initialization of key
-	 */
-	uint8_t key[strlen(keystring)/2];
-	hexify(keystring, key, strlen(keystring)/2);
-	print_table(key, 4, strlen(keystring) / 8, "key:");
-
-	/*
-	 * Key Expansion routine
-	 */
-	uint32_t expandedKey[N_b * (N_r + 1)];
-	KeyExpansion(key, expandedKey);
-
-	/*
-	 * Encryption
-	 */
-	CipherEncrypt(stateArr, expandedKey);
-	print_table(stateArr, 4, 4, "EncryptCipher:");
-
-	/*
-	 * Key expansion routine for decryption in case of EqInverseCipher
-	 */
-	uint32_t dexpandedKey[N_b * (N_r + 1)];
-	EqKeyExpansion(key, dexpandedKey);
-
-	/*
-	 * Decryption
-	 */
-	EqInverseCipher(stateArr, dexpandedKey);
-	print_table(stateArr, 4, 4, "EqInverseCipher:");
-
-	/*	 Print the round keys
-	int i = 0;
-	while (i < N_b * (N_r + 1)) {
-		printf("i: %d [0x%x], ", i, expandedKey[i]);
-		i += 1;
-	}
-	*/
-//	printf("round[10].output = ");
-
-	xprintf(stateArr, 16);
-	//printf("%x\n", gfmul(0x57, 0x83));
-	//printf("%x", xtime(xtime(0x57)));
-	return 0;
-}
