@@ -1,5 +1,4 @@
-//
-// Created by varya on 3/17/2023.
+// Created by martian on 3/17/2023.
 //
 
 #ifndef AES_SBOX_TABLE_H
